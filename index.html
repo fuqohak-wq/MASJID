@@ -184,6 +184,12 @@ let lastSave = 0;
 
 let trackingStarted = false;
 
+let localMasjid = [];
+
+let insideMosque = false;
+
+// ======================================
+
 function updateStatus(text,cls=""){
 
   document.getElementById("status")
@@ -191,6 +197,8 @@ function updateStatus(text,cls=""){
     `<div class="${cls}">${text}</div>`;
 
 }
+
+// ======================================
 
 function initMap(lat,lng){
 
@@ -210,6 +218,8 @@ function initMap(lat,lng){
 
 }
 
+// ======================================
+
 function updateMap(lat,lng){
 
   if(!map){
@@ -225,6 +235,8 @@ function updateMap(lat,lng){
   userMarker.setLatLng([lat,lng]);
 
 }
+
+// ======================================
 
 function getDistance(
   lat1,
@@ -266,6 +278,41 @@ function getDistance(
 
 }
 
+// ======================================
+// LOAD MASJID DARI SHEET
+// ======================================
+
+async function loadLocalMasjid(){
+
+  try{
+
+    const res = await fetch(
+
+      APPS_SCRIPT_URL +
+      "?type=masjid"
+
+    );
+
+    localMasjid =
+      await res.json();
+
+    console.log(
+      "Masjid lokal:",
+      localMasjid
+    );
+
+  }catch(e){
+
+    console.log(e);
+
+  }
+
+}
+
+// ======================================
+// CARI ONLINE
+// ======================================
+
 async function cariMasjidOnline(
   lat,
   lng
@@ -304,7 +351,11 @@ out center;
 
 }
 
-function startTracking(){
+// ======================================
+// START TRACKING
+// ======================================
+
+async function startTracking(){
 
   if(trackingStarted){
 
@@ -315,6 +366,9 @@ function startTracking(){
   }
 
   trackingStarted = true;
+
+  // LOAD DATABASE MASJID
+  await loadLocalMasjid();
 
   updateStatus(
     "🛰️ Tracking otomatis aktif...",
@@ -361,25 +415,76 @@ function startTracking(){
 
       let masjidList = [];
 
-      try{
+      // ==================================
+      // PRIORITAS DATABASE LOKAL
+      // ==================================
 
-        masjidList =
-          await cariMasjidOnline(
-            lat,
-            lng
-          );
+      localMasjid.forEach((m)=>{
 
-      }catch(e){
+        const d = getDistance(
 
-        console.log(e);
+          lat,
+          lng,
+
+          parseFloat(m.lat),
+          parseFloat(m.lng)
+
+        );
+
+        if(d < 250){
+
+          masjidList.push({
+
+            tags:{
+              name:m.nama
+            },
+
+            lat:parseFloat(m.lat),
+            lon:parseFloat(m.lng)
+
+          });
+
+        }
+
+      });
+
+      // ==================================
+      // JIKA KOSONG → CARI ONLINE
+      // ==================================
+
+      if(masjidList.length === 0){
+
+        try{
+
+          masjidList =
+            await cariMasjidOnline(
+              lat,
+              lng
+            );
+
+        }catch(e){
+
+          console.log(e);
+
+        }
 
       }
+
+      // ==================================
 
       if(masjidList.length === 0){
 
         document.getElementById(
           "manualBox"
         ).style.display = "block";
+
+        updateStatus(
+
+          "❌ Masjid tidak ditemukan",
+
+          "error"
+
+        );
 
         return;
 
@@ -461,11 +566,16 @@ function startTracking(){
 
       );
 
-      // ==========================
+      // ==================================
       // AUTO SAVE
-      // ==========================
+      // ==================================
 
-      if(nearestDistance < 180){
+      if(
+        nearestDistance < 180 &&
+        !insideMosque
+      ){
+
+        insideMosque = true;
 
         const now = Date.now();
 
@@ -485,6 +595,14 @@ function startTracking(){
           lng,
           nearestDistance
         );
+
+      }
+
+      // reset jika keluar area
+
+      if(nearestDistance > 250){
+
+        insideMosque = false;
 
       }
 
@@ -514,6 +632,10 @@ function startTracking(){
   );
 
 }
+
+// ======================================
+// SAVE JAMAAH
+// ======================================
 
 async function saveJamaah(
   masjid,
@@ -569,6 +691,10 @@ async function saveJamaah(
   }
 
 }
+
+// ======================================
+// SIMPAN MASJID MANUAL
+// ======================================
 
 async function simpanMasjidManual(){
 
