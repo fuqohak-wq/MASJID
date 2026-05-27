@@ -1,20 +1,15 @@
 <!DOCTYPE html>
 <html lang="id">
-
 <head>
 
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<meta name="viewport"
-content="width=device-width, initial-scale=1.0">
+<title>Auto Jamaah Tracker PRO</title>
 
-<title>Auto Jamaah Tracker</title>
+<meta name="theme-color" content="#1565c0">
 
-<meta name="theme-color"
-content="#1565c0">
-
-<link rel="manifest"
-href="manifest.json">
+<link rel="manifest" href="manifest.json">
 
 <link
 rel="stylesheet"
@@ -93,6 +88,11 @@ input{
   font-weight:bold;
 }
 
+.warning{
+  color:#ef6c00;
+  font-weight:bold;
+}
+
 #map{
   width:100%;
   height:320px;
@@ -112,10 +112,10 @@ input{
 
 <div class="header">
 
-<h2>🕌 Auto Jamaah Tracker</h2>
+<h2>🕌 Auto Jamaah Tracker PRO</h2>
 
 <div>
-Deteksi Jamaah Otomatis
+Deteksi Jamaah + Muroja'ah Otomatis
 </div>
 
 </div>
@@ -165,14 +165,29 @@ src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js">
 
 <script>
 
-// ======================================
-// APPS SCRIPT URL
-// ======================================
+// =====================================================
+// URL APPS SCRIPT
+// =====================================================
 
 const APPS_SCRIPT_URL =
 "https://script.google.com/macros/s/AKfycbzQDuCYwJIAknr6Ybi-FKv5S1CkkO0Vg1s6e6UcaewcK3bdK6R494-ie3kks4N1gTKyBg/exec";
 
-// ======================================
+// =====================================================
+// KONFIGURASI
+// =====================================================
+
+const RADIUS_MASJID = 60;
+const RADIUS_KELUAR = 90;
+
+const MIN_AKURASI = 30;
+
+const DURASI_JAMAAH = 12;
+const DURASI_SEMPURNA = 20;
+const DURASI_MUROJAAH = 45;
+
+const MAX_GERAK_DIAM = 12;
+
+// =====================================================
 
 let map;
 let userMarker;
@@ -180,15 +195,23 @@ let userMarker;
 let currentLat = 0;
 let currentLng = 0;
 
-let lastSave = 0;
-
 let trackingStarted = false;
 
 let localMasjid = [];
 
 let insideMosque = false;
 
-// ======================================
+let masjidMasukTime = null;
+
+let lastPosition = null;
+
+let statusJamaah = false;
+let statusSempurna = false;
+let statusMurojaah = false;
+
+let currentMasjid = "";
+
+// =====================================================
 
 function updateStatus(text,cls=""){
 
@@ -198,7 +221,7 @@ function updateStatus(text,cls=""){
 
 }
 
-// ======================================
+// =====================================================
 
 function initMap(lat,lng){
 
@@ -218,7 +241,7 @@ function initMap(lat,lng){
 
 }
 
-// ======================================
+// =====================================================
 
 function updateMap(lat,lng){
 
@@ -236,7 +259,7 @@ function updateMap(lat,lng){
 
 }
 
-// ======================================
+// =====================================================
 
 function getDistance(
   lat1,
@@ -278,9 +301,9 @@ function getDistance(
 
 }
 
-// ======================================
-// LOAD MASJID DARI SHEET
-// ======================================
+// =====================================================
+// LOAD DATABASE MASJID
+// =====================================================
 
 async function loadLocalMasjid(){
 
@@ -296,10 +319,7 @@ async function loadLocalMasjid(){
     localMasjid =
       await res.json();
 
-    console.log(
-      "Masjid lokal:",
-      localMasjid
-    );
+    console.log(localMasjid);
 
   }catch(e){
 
@@ -309,9 +329,9 @@ async function loadLocalMasjid(){
 
 }
 
-// ======================================
-// CARI ONLINE
-// ======================================
+// =====================================================
+// CARI MASJID ONLINE
+// =====================================================
 
 async function cariMasjidOnline(
   lat,
@@ -351,9 +371,9 @@ out center;
 
 }
 
-// ======================================
-// DETEKSI WAKTU SHALAT
-// ======================================
+// =====================================================
+// DETEKSI SHALAT
+// =====================================================
 
 function getShalatNow(){
 
@@ -368,15 +388,11 @@ function getShalatNow(){
   const total =
     jam * 60 + menit;
 
-  // SUBUH
-
   if(total >= 240 && total < 330){
 
     return "Subuh";
 
   }
-
-  // DZUHUR
 
   if(total >= 690 && total < 900){
 
@@ -384,15 +400,11 @@ function getShalatNow(){
 
   }
 
-  // ASHAR
-
   if(total >= 900 && total < 1050){
 
     return "Ashar";
 
   }
-
-  // MAGHRIB
 
   if(total >= 1050 && total < 1140){
 
@@ -400,21 +412,89 @@ function getShalatNow(){
 
   }
 
-  // ISYA
-
   if(total >= 1140 && total < 1320){
 
     return "Isya";
 
   }
 
-  return "Diluar Waktu Shalat";
+  return null;
 
 }
 
-// ======================================
+// =====================================================
+// SAVE DATA
+// =====================================================
+
+async function saveJamaah(
+  masjid,
+  lat,
+  lng,
+  jarak,
+  status,
+  durasi
+){
+
+  try{
+
+    await fetch(APPS_SCRIPT_URL,{
+
+      method:"POST",
+
+      body:JSON.stringify({
+
+        type:"jamaah",
+
+        shalat:getShalatNow(),
+
+        masjid:masjid,
+
+        lat:lat,
+
+        lng:lng,
+
+        status:status,
+
+        jarak:Math.round(jarak),
+
+        durasi:Math.round(durasi)
+
+      }),
+
+      mode:"no-cors"
+
+    });
+
+    updateStatus(
+
+      `✅ ${status}<br><br>
+
+      🕌 ${masjid}<br><br>
+
+      🕐 ${getShalatNow()}<br><br>
+
+      ⏳ ${Math.round(durasi)} menit<br><br>
+
+      📍 ${Math.round(jarak)} meter`,
+
+      "success"
+
+    );
+
+  }catch(e){
+
+    updateStatus(
+      "❌ Gagal menyimpan",
+      "error"
+    );
+
+  }
+
+}
+
+// =====================================================
 // START TRACKING
-// ======================================
+// =====================================================
 
 async function startTracking(){
 
@@ -428,11 +508,10 @@ async function startTracking(){
 
   trackingStarted = true;
 
-  // LOAD DATABASE MASJID
   await loadLocalMasjid();
 
   updateStatus(
-    "🛰️ Tracking otomatis aktif...",
+    "🛰️ Tracking aktif...",
     "info"
   );
 
@@ -454,31 +533,55 @@ async function startTracking(){
 
       updateMap(lat,lng);
 
-      updateStatus(
+      // =========================================
+      // VALIDASI AKURASI
+      // =========================================
 
-        `🛰️ GPS aktif<br><br>
+      if(accuracy > MIN_AKURASI){
 
-        📍 Latitude:
-        ${lat}<br>
+        updateStatus(
 
-        📍 Longitude:
-        ${lng}<br><br>
+          `⚠️ GPS tidak akurat<br><br>
 
-        🎯 Akurasi:
-        ${Math.round(accuracy)}
-        meter<br><br>
+          Akurasi:
+          ${Math.round(accuracy)} meter<br><br>
 
-        🔍 Memantau lokasi masjid...`,
+          Tunggu GPS stabil...`,
 
-        "info"
+          "warning"
 
-      );
+        );
+
+        return;
+
+      }
+
+      // =========================================
+      // VALIDASI WAKTU SHALAT
+      // =========================================
+
+      const shalatNow =
+        getShalatNow();
+
+      if(!shalatNow){
+
+        updateStatus(
+
+          "⏰ Diluar waktu shalat",
+
+          "info"
+
+        );
+
+        return;
+
+      }
+
+      // =========================================
+      // LOAD MASJID
+      // =========================================
 
       let masjidList = [];
-
-      // ==================================
-      // PRIORITAS DATABASE LOKAL
-      // ==================================
 
       localMasjid.forEach((m)=>{
 
@@ -509,10 +612,6 @@ async function startTracking(){
 
       });
 
-      // ==================================
-      // JIKA KOSONG → CARI ONLINE
-      // ==================================
-
       if(masjidList.length === 0){
 
         try{
@@ -531,25 +630,20 @@ async function startTracking(){
 
       }
 
-      // ==================================
-
       if(masjidList.length === 0){
 
-        document.getElementById(
-          "manualBox"
-        ).style.display = "block";
-
         updateStatus(
-
           "❌ Masjid tidak ditemukan",
-
           "error"
-
         );
 
         return;
 
       }
+
+      // =========================================
+      // CARI MASJID TERDEKAT
+      // =========================================
 
       let nearest = null;
 
@@ -597,76 +691,183 @@ async function startTracking(){
 
         "Masjid Tanpa Nama";
 
-      const mlat =
-        nearest.lat || nearest.center?.lat;
+      // =========================================
+      // MASUK AREA MASJID
+      // =========================================
 
-      const mlng =
-        nearest.lon || nearest.center?.lon;
+      if(nearestDistance < RADIUS_MASJID){
 
-      L.marker([mlat,mlng])
-        .addTo(map)
-        .bindPopup(namaMasjid);
+        // baru masuk
 
-      updateStatus(
+        if(!insideMosque){
 
-        `🕌 Masjid terdekat:<br><br>
+          insideMosque = true;
 
-        <b>${namaMasjid}</b><br><br>
+          currentMasjid =
+            namaMasjid;
 
-        📍 Jarak:
-        ${Math.round(nearestDistance)}
-        meter<br><br>
+          masjidMasukTime =
+            Date.now();
 
-        🕐 Waktu:
-        ${getShalatNow()}<br><br>
+          lastPosition = {
+            lat,
+            lng
+          };
 
-        🎯 Akurasi GPS:
-        ${Math.round(accuracy)}
-        meter<br><br>
-
-        🔄 Tracking berjalan otomatis`,
-
-        "success"
-
-      );
-
-      // ==================================
-      // AUTO SAVE
-      // ==================================
-
-      if(
-        nearestDistance < 180 &&
-        !insideMosque
-      ){
-
-        insideMosque = true;
-
-        const now = Date.now();
-
-        // anti spam 2 jam
-
-        if(now - lastSave < 7200000){
-
-          return;
+          statusJamaah = false;
+          statusSempurna = false;
+          statusMurojaah = false;
 
         }
 
-        lastSave = now;
+        // =====================================
+        // HITUNG GERAK
+        // =====================================
 
-        await saveJamaah(
-          namaMasjid,
+        const gerak =
+          getDistance(
+            lat,
+            lng,
+            lastPosition.lat,
+            lastPosition.lng
+          );
+
+        lastPosition = {
           lat,
-          lng,
-          nearestDistance
+          lng
+        };
+
+        // jika terlalu banyak gerak
+        // reset timer
+
+        if(gerak > MAX_GERAK_DIAM){
+
+          masjidMasukTime =
+            Date.now();
+
+        }
+
+        // =====================================
+        // HITUNG DURASI
+        // =====================================
+
+        const durasi =
+
+          (Date.now() -
+          masjidMasukTime)
+
+          / 1000 / 60;
+
+        updateStatus(
+
+          `🕌 ${namaMasjid}<br><br>
+
+          🕐 ${shalatNow}<br><br>
+
+          📍 ${Math.round(nearestDistance)}
+          meter<br><br>
+
+          🎯 GPS:
+          ${Math.round(accuracy)}
+          meter<br><br>
+
+          ⏳ Menetap:
+          ${Math.round(durasi)}
+          menit`,
+
+          "info"
+
         );
 
-      }
+        // =====================================
+        // JAMAAH
+        // =====================================
 
-      // reset jika keluar area
+        if(
+          durasi >= DURASI_JAMAAH &&
+          !statusJamaah
+        ){
 
-      if(nearestDistance > 250){
+          statusJamaah = true;
 
-        insideMosque = false;
+          await saveJamaah(
+
+            namaMasjid,
+            lat,
+            lng,
+            nearestDistance,
+            "Jamaah",
+            durasi
+
+          );
+
+        }
+
+        // =====================================
+        // JAMAAH SEMPURNA
+        // =====================================
+
+        if(
+          durasi >= DURASI_SEMPURNA &&
+          !statusSempurna
+        ){
+
+          statusSempurna = true;
+
+          await saveJamaah(
+
+            namaMasjid,
+            lat,
+            lng,
+            nearestDistance,
+            "Jamaah Sempurna",
+            durasi
+
+          );
+
+        }
+
+        // =====================================
+        // MUROJAAH
+        // =====================================
+
+        if(
+          durasi >= DURASI_MUROJAAH &&
+          !statusMurojaah
+        ){
+
+          statusMurojaah = true;
+
+          await saveJamaah(
+
+            namaMasjid,
+            lat,
+            lng,
+            nearestDistance,
+            "Jamaah + Muroja'ah",
+            durasi
+
+          );
+
+        }
+
+      }else{
+
+        // =====================================
+        // KELUAR AREA MASJID
+        // =====================================
+
+        if(nearestDistance > RADIUS_KELUAR){
+
+          insideMosque = false;
+
+          masjidMasukTime = null;
+
+          lastPosition = null;
+
+          currentMasjid = "";
+
+        }
 
       }
 
@@ -676,7 +877,7 @@ async function startTracking(){
 
       updateStatus(
 
-        "❌ GPS gagal:<br>" +
+        "❌ GPS gagal<br><br>" +
         err.message,
 
         "error"
@@ -697,76 +898,9 @@ async function startTracking(){
 
 }
 
-// ======================================
-// SAVE JAMAAH
-// ======================================
-
-async function saveJamaah(
-  masjid,
-  lat,
-  lng,
-  jarak
-){
-
-  try{
-
-    await fetch(APPS_SCRIPT_URL,{
-
-      method:"POST",
-
-      body:JSON.stringify({
-
-        type:"jamaah",
-
-        shalat:getShalatNow(),
-
-        masjid:masjid,
-
-        lat:lat,
-
-        lng:lng,
-
-        status:"Jamaah",
-
-        jarak:jarak
-
-      }),
-
-      mode:"no-cors"
-
-    });
-
-    updateStatus(
-
-      `✅ Jamaah tercatat otomatis<br><br>
-
-      🕌 ${masjid}<br><br>
-
-      🕐 ${getShalatNow()}<br><br>
-
-      📍 ${Math.round(jarak)}
-      meter<br><br>
-
-      🔄 Tracking tetap berjalan`,
-
-      "success"
-
-    );
-
-  }catch(e){
-
-    updateStatus(
-      "❌ Gagal menyimpan data",
-      "error"
-    );
-
-  }
-
-}
-
-// ======================================
+// =====================================================
 // SIMPAN MASJID MANUAL
-// ======================================
+// =====================================================
 
 async function simpanMasjidManual(){
 
@@ -793,8 +927,11 @@ async function simpanMasjidManual(){
       body:JSON.stringify({
 
         type:"masjid",
+
         nama:nama,
+
         lat:currentLat,
+
         lng:currentLng
 
       }),
@@ -810,7 +947,7 @@ async function simpanMasjidManual(){
   }catch(e){
 
     alert(
-      "❌ Gagal menyimpan masjid"
+      "❌ Gagal menyimpan"
     );
 
   }
