@@ -10,7 +10,11 @@ content="width=device-width, initial-scale=1.0">
 
 <title>Auto Jamaah Tracker</title>
 
-<link rel="manifest" href="manifest.json">
+<meta name="theme-color"
+content="#1565c0">
+
+<link rel="manifest"
+href="manifest.json">
 
 <link
 rel="stylesheet"
@@ -121,7 +125,7 @@ Deteksi Jamaah Otomatis
 <div class="card">
 
 <button onclick="startTracking()">
-Aktifkan Tracking Jamaah
+▶ Mulai Tracking Otomatis
 </button>
 
 <div id="status">
@@ -175,6 +179,10 @@ let userMarker;
 
 let currentLat = 0;
 let currentLng = 0;
+
+let lastSave = 0;
+
+let trackingStarted = false;
 
 function updateStatus(text,cls=""){
 
@@ -296,14 +304,24 @@ out center;
 
 }
 
-async function startTracking(){
+function startTracking(){
+
+  if(trackingStarted){
+
+    alert("Tracking sudah aktif");
+
+    return;
+
+  }
+
+  trackingStarted = true;
 
   updateStatus(
-    "🛰️ Mengaktifkan GPS...",
+    "🛰️ Tracking otomatis aktif...",
     "info"
   );
 
-  navigator.geolocation.getCurrentPosition(
+  navigator.geolocation.watchPosition(
 
     async(pos)=>{
 
@@ -323,11 +341,19 @@ async function startTracking(){
 
       updateStatus(
 
-        `🛰️ GPS aktif<br>
-        Akurasi:
-        ${Math.round(accuracy)} meter<br><br>
+        `🛰️ GPS aktif<br><br>
 
-        🔍 Mencari masjid sekitar...`,
+        📍 Latitude:
+        ${lat}<br>
+
+        📍 Longitude:
+        ${lng}<br><br>
+
+        🎯 Akurasi:
+        ${Math.round(accuracy)}
+        meter<br><br>
+
+        🔍 Memantau lokasi masjid...`,
 
         "info"
 
@@ -350,16 +376,6 @@ async function startTracking(){
       }
 
       if(masjidList.length === 0){
-
-        updateStatus(
-
-          `❌ Masjid online tidak ditemukan<br><br>
-
-          Silakan simpan manual.`,
-
-          "error"
-
-        );
 
         document.getElementById(
           "manualBox"
@@ -403,11 +419,6 @@ async function startTracking(){
 
       if(!nearest){
 
-        updateStatus(
-          "❌ Gagal menentukan masjid terdekat",
-          "error"
-        );
-
         return;
 
       }
@@ -432,25 +443,41 @@ async function startTracking(){
 
       updateStatus(
 
-        `🕌 Masjid terdekat:<br>
+        `🕌 Masjid terdekat:<br><br>
 
         <b>${namaMasjid}</b><br><br>
 
-        📍 Jarak:<br>
-
+        📍 Jarak:
         ${Math.round(nearestDistance)}
         meter<br><br>
 
-        🛰️ Akurasi GPS:<br>
-
+        🎯 Akurasi GPS:
         ${Math.round(accuracy)}
-        meter`,
+        meter<br><br>
 
-        "info"
+        🔄 Tracking berjalan otomatis`,
+
+        "success"
 
       );
 
+      // ==========================
+      // AUTO SAVE
+      // ==========================
+
       if(nearestDistance < 180){
+
+        const now = Date.now();
+
+        // anti spam 2 jam
+
+        if(now - lastSave < 7200000){
+
+          return;
+
+        }
+
+        lastSave = now;
 
         await saveJamaah(
           namaMasjid,
@@ -458,12 +485,6 @@ async function startTracking(){
           lng,
           nearestDistance
         );
-
-      }else{
-
-        document.getElementById(
-          "manualBox"
-        ).style.display = "block";
 
       }
 
@@ -527,10 +548,12 @@ async function saveJamaah(
 
       `✅ Jamaah tercatat otomatis<br><br>
 
-      🕌 ${masjid}<br>
+      🕌 ${masjid}<br><br>
 
       📍 ${Math.round(jarak)}
-      meter`,
+      meter<br><br>
+
+      🔄 Tracking tetap berjalan`,
 
       "success"
 
