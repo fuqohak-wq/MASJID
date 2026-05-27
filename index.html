@@ -352,6 +352,67 @@ out center;
 }
 
 // ======================================
+// DETEKSI WAKTU SHALAT
+// ======================================
+
+function getShalatNow(){
+
+  const now = new Date();
+
+  const jam =
+    now.getHours();
+
+  const menit =
+    now.getMinutes();
+
+  const total =
+    jam * 60 + menit;
+
+  // SUBUH
+
+  if(total >= 240 && total < 330){
+
+    return "Subuh";
+
+  }
+
+  // DZUHUR
+
+  if(total >= 690 && total < 900){
+
+    return "Dzuhur";
+
+  }
+
+  // ASHAR
+
+  if(total >= 900 && total < 1050){
+
+    return "Ashar";
+
+  }
+
+  // MAGHRIB
+
+  if(total >= 1050 && total < 1140){
+
+    return "Maghrib";
+
+  }
+
+  // ISYA
+
+  if(total >= 1140 && total < 1320){
+
+    return "Isya";
+
+  }
+
+  return "Diluar Waktu Shalat";
+
+}
+
+// ======================================
 // START TRACKING
 // ======================================
 
@@ -556,6 +617,9 @@ async function startTracking(){
         ${Math.round(nearestDistance)}
         meter<br><br>
 
+        🕐 Waktu:
+        ${getShalatNow()}<br><br>
+
         🎯 Akurasi GPS:
         ${Math.round(accuracy)}
         meter<br><br>
@@ -653,11 +717,17 @@ async function saveJamaah(
       body:JSON.stringify({
 
         type:"jamaah",
-        shalat:"Maghrib",
+
+        shalat:getShalatNow(),
+
         masjid:masjid,
+
         lat:lat,
+
         lng:lng,
+
         status:"Jamaah",
+
         jarak:jarak
 
       }),
@@ -671,6 +741,8 @@ async function saveJamaah(
       `✅ Jamaah tercatat otomatis<br><br>
 
       🕌 ${masjid}<br><br>
+
+      🕐 ${getShalatNow()}<br><br>
 
       📍 ${Math.round(jarak)}
       meter<br><br>
