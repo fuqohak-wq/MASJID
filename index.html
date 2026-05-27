@@ -14,7 +14,15 @@ href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
 />
 
 <style>
+<script>
 
+if('serviceWorker' in navigator){
+
+  navigator.serviceWorker.register('sw.js');
+
+}
+
+</script>
 body{
   margin:0;
   font-family:Arial,sans-serif;
