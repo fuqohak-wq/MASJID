@@ -2,11 +2,15 @@
 <html lang="id">
 
 <head>
-<link rel="manifest" href="manifest.json">
+
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<meta name="viewport"
+content="width=device-width, initial-scale=1.0">
 
 <title>Auto Jamaah Tracker</title>
+
+<link rel="manifest" href="manifest.json">
 
 <link
 rel="stylesheet"
@@ -14,15 +18,7 @@ href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
 />
 
 <style>
-<script>
 
-if('serviceWorker' in navigator){
-
-  navigator.serviceWorker.register('sw.js');
-
-}
-
-</script>
 body{
   margin:0;
   font-family:Arial,sans-serif;
@@ -159,7 +155,9 @@ placeholder="Nama masjid / musholla"
 
 </div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script
+src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js">
+</script>
 
 <script>
 
@@ -220,15 +218,23 @@ function updateMap(lat,lng){
 
 }
 
-function getDistance(lat1, lon1, lat2, lon2){
+function getDistance(
+  lat1,
+  lon1,
+  lat2,
+  lon2
+){
 
   const R = 6371e3;
 
   const φ1 = lat1 * Math.PI/180;
   const φ2 = lat2 * Math.PI/180;
 
-  const Δφ = (lat2-lat1) * Math.PI/180;
-  const Δλ = (lon2-lon1) * Math.PI/180;
+  const Δφ =
+    (lat2-lat1) * Math.PI/180;
+
+  const Δλ =
+    (lon2-lon1) * Math.PI/180;
 
   const a =
 
@@ -252,7 +258,10 @@ function getDistance(lat1, lon1, lat2, lon2){
 
 }
 
-async function cariMasjidOnline(lat,lng){
+async function cariMasjidOnline(
+  lat,
+  lng
+){
 
   const query = `
 
@@ -298,9 +307,14 @@ async function startTracking(){
 
     async(pos)=>{
 
-      const lat = pos.coords.latitude;
-      const lng = pos.coords.longitude;
-      const accuracy = pos.coords.accuracy;
+      const lat =
+        pos.coords.latitude;
+
+      const lng =
+        pos.coords.longitude;
+
+      const accuracy =
+        pos.coords.accuracy;
 
       currentLat = lat;
       currentLng = lng;
@@ -310,7 +324,9 @@ async function startTracking(){
       updateStatus(
 
         `🛰️ GPS aktif<br>
-        Akurasi: ${Math.round(accuracy)} meter<br><br>
+        Akurasi:
+        ${Math.round(accuracy)} meter<br><br>
+
         🔍 Mencari masjid sekitar...`,
 
         "info"
@@ -322,7 +338,10 @@ async function startTracking(){
       try{
 
         masjidList =
-          await cariMasjidOnline(lat,lng);
+          await cariMasjidOnline(
+            lat,
+            lng
+          );
 
       }catch(e){
 
@@ -335,21 +354,25 @@ async function startTracking(){
         updateStatus(
 
           `❌ Masjid online tidak ditemukan<br><br>
+
           Silakan simpan manual.`,
 
           "error"
 
         );
 
-        document.getElementById("manualBox")
-          .style.display = "block";
+        document.getElementById(
+          "manualBox"
+        ).style.display = "block";
 
         return;
 
       }
 
       let nearest = null;
-      let nearestDistance = 999999;
+
+      let nearestDistance =
+        999999;
 
       masjidList.forEach((m)=>{
 
@@ -371,6 +394,7 @@ async function startTracking(){
         if(d < nearestDistance){
 
           nearestDistance = d;
+
           nearest = m;
 
         }
@@ -409,19 +433,22 @@ async function startTracking(){
       updateStatus(
 
         `🕌 Masjid terdekat:<br>
+
         <b>${namaMasjid}</b><br><br>
 
         📍 Jarak:<br>
-        ${Math.round(nearestDistance)} meter<br><br>
+
+        ${Math.round(nearestDistance)}
+        meter<br><br>
 
         🛰️ Akurasi GPS:<br>
-        ${Math.round(accuracy)} meter`,
+
+        ${Math.round(accuracy)}
+        meter`,
 
         "info"
 
       );
-
-      // radius realistis
 
       if(nearestDistance < 180){
 
@@ -434,8 +461,9 @@ async function startTracking(){
 
       }else{
 
-        document.getElementById("manualBox")
-          .style.display = "block";
+        document.getElementById(
+          "manualBox"
+        ).style.display = "block";
 
       }
 
@@ -501,7 +529,8 @@ async function saveJamaah(
 
       🕌 ${masjid}<br>
 
-      📍 ${Math.round(jarak)} meter`,
+      📍 ${Math.round(jarak)}
+      meter`,
 
       "success"
 
@@ -522,8 +551,9 @@ async function simpanMasjidManual(){
 
   const nama =
 
-    document.getElementById("namaMasjid")
-    .value;
+    document.getElementById(
+      "namaMasjid"
+    ).value;
 
   if(!nama){
 
@@ -552,13 +582,27 @@ async function simpanMasjidManual(){
 
     });
 
-    alert("✅ Masjid berhasil disimpan");
+    alert(
+      "✅ Masjid berhasil disimpan"
+    );
 
   }catch(e){
 
-    alert("❌ Gagal menyimpan masjid");
+    alert(
+      "❌ Gagal menyimpan masjid"
+    );
 
   }
+
+}
+
+</script>
+
+<script>
+
+if('serviceWorker' in navigator){
+
+  navigator.serviceWorker.register('sw.js');
 
 }
 
