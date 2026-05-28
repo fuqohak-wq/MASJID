@@ -138,7 +138,7 @@
     // ======================================================
     // KONFIGURASI (DIOPTIMALKAN UNTUK JARAK DEKAT 50 LANGKAH)
     // ======================================================
-    const RADIUS_MASJID = 20; // Diperkecil agar tidak tumpang tindih dengan rumah
+    const RADIUS_MASJID = 20; // Radius murni diperkecil agar tidak tumpang tindih dengan rumah
     const RADIUS_KELUAR = 35;
     const MIN_AKURASI = 100;   // Dilonggarkan jadi 100m agar GPS indoor masjid (98m) tidak mematikan sistem
 
@@ -149,7 +149,7 @@
     const SESSION_TRACKING_MENIT = 45;
     const MAX_GERAK_DIAM = 12;
 
-    // ⚠️ SILAKAN GANTI KOORDINAT INI DENGAN TITIK KOORDINAT RUMAH ANDA SEBENARNYA
+    // ⚠️ KOORDINAT RUMAH (Silakan ganti angka di bawah ini dengan titik koordinat rumah Anda jika diperlukan)
     const KOORDINAT_RUMAH = {
       lat: -6.200000, 
       lng: 106.800000 
@@ -420,7 +420,7 @@
             const durasi = ((Date.now() - masjidMasukTime) / 1000 / 60);
 
             updateStatus(
-              `Base: 100% 🕌 ${namaMasjid}<br><br>
+              `🕌 ${namaMasjid}<br><br>
                🕐 Waktu: ${shalatNow}<br><br>
                📍 Jarak Pusat: ${Math.round(nearestDistance)} meter<br><br>
                🎯 Sinyal Akurasi: ${Math.round(accuracy)} meter<br><br>
@@ -453,7 +453,7 @@
               masjidMasukTime = null;
               lastPosition = null;
 
-              updateStatus(` Walk: Di Luar Area Masjid<br><br>📍 Jarak: ${Math.round(nearestDistance)} meter`, "warning");
+              updateStatus(` Di Luar Area Masjid<br><br>📍 Jarak: ${Math.round(nearestDistance)} meter`, "warning");
             }
           }
         },
@@ -528,8 +528,21 @@
   </script>
 
   <script>
+    // Registrasi Service Worker bawaan
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('sw.js');
+    }
+
+    // Mendengarkan sinyal kebangkitan otomatis (Push) dari sw.js
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', (event) => {
+        if (event.data && event.data.command === "AUTO_START_TRACKING") {
+          console.log("Meninggalkan mode standby, otomatis melacak lokasi...");
+          if (!trackingStarted) {
+            startTracking();
+          }
+        }
+      });
     }
   </script>
 </body>
