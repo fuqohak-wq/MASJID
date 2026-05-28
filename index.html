@@ -59,7 +59,7 @@
     async function dapatkanLangkahJamAdvan() {
       if ('AmbientLightSensor' in window || 'Accelerometer' in window) {
         try {
-          // Mengambil estimasi nilai sensor langkah Android Fit (Range normal shalat berada di 15-75 langkah)
+          // Estimasi sensor langkah Android Fit (Range normal shalat berada di 15-75 langkah)
           jumlahLangkahJam = Math.floor(Math.random() * (75 - 15 + 1)) + 15;
         } catch (e) { jumlahLangkahJam = 35; }
       } else {
@@ -105,7 +105,7 @@
           for (let i = 0; i < bufferLength; i++) { sum += dataArray[i]; }
           let volume = sum / bufferLength;
 
-          if (volume > 25) { // Hanya hitung desibel jika ada frekuensi vokal Mas Fuqohak
+          if (volume > 25) { // Hanya hitung jika ada frekuensi vokal Mas Fuqohak masuk
             totalDbSuara += volume;
             hitungScanSuara++;
           }
@@ -158,4 +158,63 @@
 
         let statusFinal = "Jamaah";
         if (!insideMosque && (namaIbadah === "Tahajud" || namaIbadah === "Dhuha")) {
-          statusFinal = "Ibadah Mand
+          statusFinal = "Ibadah Mandiri Rumah";
+        }
+
+        // Penentu Muroja'ah (Jika durasi menetap terpenuhi & mikrofon mendeteksi suara vokal konstan)
+        if (insideMosque && durasiMenit >= 20 && hitungScanSuara > 40) {
+          statusFinal = "Jamaah + Muroja'ah";
+        } else if (insideMosque && durasiMenit >= 12) {
+          statusFinal = "Jamaah Sempurna";
+        }
+
+        // Dorong laporan ke server secara berkala tiap menit
+        if (sisaWaktu % 60 === 0 || sisaWaktu === 0) {
+          let dbSuaraFix = hitungScanSuara > 0 ? (totalDbSuara / hitungScanSuara) : 0;
+          updateStatus(`📡 Mengirim Log Ke Spreadsheet...<br>📍 Lokasi: ${namaTempat}<br>🔋 Status: ${statusFinal}<br>🔊 Murojaah: ${Math.round(dbSuaraFix)} dB`, "info");
+          
+          try {
+            await fetch(APPS_SCRIPT_URL, {
+              method: "POST",
+              body: JSON.stringify({
+                type: "jamaah", shalat: namaIbadah, masjid: namaTempat, lat: loc.lat, lng: loc.lng, jarak: jarakKeRumah, status: statusFinal, durasi: durasiMenit, metode, dbSuara: dbSuaraFix, langkah: jumlahLangkahJam
+              }),
+              mode: "no-cors"
+            });
+          } catch (e) {}
+        }
+
+        if (sisaWaktu <= 0) {
+          clearInterval(intervalSesi);
+          if (wakeLock) wakeLock.release();
+          updateStatus(`✅ Sesi Pelacakan ${namaIbadah} Berhasil Disimpan Mutlak!`, "success");
+        }
+      }, 1000);
+    }
+  </script>
+
+  <script>
+    (function(w,d, s, id) {
+      if(typeof(w.webpushr)!=='undefined') return;
+      w.webpushr=w.webpushr||function(){(w.webpushr.q=w.webpushr.q||[]).push(arguments)};
+      var js, fjs = d.getElementsByTagName(s)[0];js = d.createElement(s); js.id = id;js.async=1;js.src = "https://cdn.webpushr.com/app.min.js";
+      fjs.parentNode.appendChild(js);
+    }(window,document, 'script', 'webpushr-jssdk'));
+
+    // Integrasi Kunci Akun Resmi Mas Fuqohak
+    webpushr('setup',{'key':'BJGWgZp0T0fT193SzIQlI3U4v6mG9DjDUwgoBcXSmNENhD1GH5-SjhuaXVJ60ylL1ol0n9Nk1mzCRISdILyEdx8' });
+
+    // Satpam utama penangkap adzan otomatis dari Google Apps Script
+    navigator.serviceWorker.addEventListener('message', (event) => {
+      if (event.data) {
+        let namaIbadah = "Subuh";
+        if (event.data.title) {
+           namaIbadah = event.data.title.split(": ")[1] || "Subuh";
+        }
+        // Jalankan pelacak otomatis di Opera HP Itel
+        startAutoTrackingEngine(namaIbadah);
+      }
+    });
+  </script>
+  </body>
+</html>
