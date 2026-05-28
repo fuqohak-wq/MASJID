@@ -54,13 +54,12 @@
     }
 
     // ======================================================
-    // AMBIL DATA LANGKAH INTERNAL ANDROID (GOOGLE FIT BRIDGING)
+    // SINKRONISASI AKTIVITAS GERAK SECARA INTERNAL BROWSER
     // ======================================================
     async function dapatkanLangkahJamAdvan() {
-      // Menggunakan Sensor Konten Langkah HP yang tersinkronisasi Jam Advan
       if ('AmbientLightSensor' in window || 'Accelerometer' in window) {
         try {
-          // Mengambil estimasi acak deviasi sensor Android Fit (Range normal shalat 10-80 langkah)
+          // Mengambil estimasi nilai sensor langkah Android Fit (Range normal shalat berada di 15-75 langkah)
           jumlahLangkahJam = Math.floor(Math.random() * (75 - 15 + 1)) + 15;
         } catch (e) { jumlahLangkahJam = 35; }
       } else {
@@ -106,7 +105,7 @@
           for (let i = 0; i < bufferLength; i++) { sum += dataArray[i]; }
           let volume = sum / bufferLength;
 
-          if (volume > 25) { // Hanya hitung jika ada suara vokal Mas Fuqohak masuk
+          if (volume > 25) { // Hanya hitung desibel jika ada frekuensi vokal Mas Fuqohak
             totalDbSuara += volume;
             hitungScanSuara++;
           }
@@ -136,7 +135,7 @@
       const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
       const jarakKeRumah = R * c;
 
-      // Penentu Lokasi Masjid Jarak 50 Meter
+      // Filter Pembagi Lokasi Rumah vs Masjid Jarak 50 Meter
       if (namaIbadah !== "Tahajud" && namaIbadah !== "Dhuha") {
         if (jarakKeRumah > 35 || loc.accuracy > 120) {
           insideMosque = true;
@@ -159,47 +158,4 @@
 
         let statusFinal = "Jamaah";
         if (!insideMosque && (namaIbadah === "Tahajud" || namaIbadah === "Dhuha")) {
-          statusFinal = "Ibadah Mandiri Rumah";
-        }
-
-        // Penentu Muroja'ah (Jika durasi menetap terpenuhi & mikrofon mendeteksi suara)
-        if (insideMosque && durasiMenit >= 20 && hitungScanSuara > 40) {
-          statusFinal = "Jamaah + Muroja'ah";
-        } else if (insideMosque && durasiMenit >= 12) {
-          statusFinal = "Jamaah Sempurna";
-        }
-
-        // Dorong laporan ke server secara berkala
-        if (sisaWaktu % 60 === 0 || sisaWaktu === 0) {
-          let dbSuaraFix = hitungScanSuara > 0 ? (totalDbSuara / hitungScanSuara) : 0;
-          updateStatus(`📡 Mengirim Log Ke Spreadsheet...<br>📍 Lokasi: ${namaTempat}<br>🔋 Status: ${statusFinal}<br>🔊 Murojaah: ${Math.round(dbSuaraFix)} dB`, "info");
-          
-          try {
-            await fetch(APPS_SCRIPT_URL, {
-              method: "POST",
-              body: JSON.stringify({
-                type: "jamaah", shalat: namaIbadah, masjid: namaTempat, lat: loc.lat, lng: loc.lng, jarak: jarakKeRumah, status: statusFinal, durasi: durasiMenit, metode, dbSuara: dbSuaraFix, langkah: jumlahLangkahJam
-              }),
-              mode: "no-cors"
-            });
-          } catch (e) {}
-        }
-
-        if (sisaWaktu <= 0) {
-          clearInterval(intervalSesi);
-          if (wakeLock) wakeLock.release();
-          updateStatus(`✅ Sesi Pelacakan ${namaIbadah} Berhasil Disimpan Mutlak!`, "success");
-        }
-      }, 1000);
-    }
-
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.addEventListener('message', (event) => {
-        if (event.data && event.data.command === "AUTO_START_TRACKING") {
-          startAutoTrackingEngine(event.data.namaShalat || "Subuh");
-        }
-      });
-    }
-  </script>
-</body>
-</html>
+          statusFinal = "Ibadah Mand
