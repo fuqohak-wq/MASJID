@@ -138,9 +138,9 @@
     // ======================================================
     // KONFIGURASI (DIOPTIMALKAN UNTUK JARAK DEKAT 50 LANGKAH)
     // ======================================================
-    const RADIUS_MASJID = 20; // Radius murni diperkecil agar tidak tumpang tindih dengan rumah
+    const RADIUS_MASJID = 20; 
     const RADIUS_KELUAR = 35;
-    const MIN_AKURASI = 100;   // Dilonggarkan jadi 100m agar GPS indoor masjid (98m) tidak mematikan sistem
+    const MIN_AKURASI = 100;   
 
     const DURASI_JAMAAH = 12;
     const DURASI_SEMPURNA = 20;
@@ -149,7 +149,7 @@
     const SESSION_TRACKING_MENIT = 45;
     const MAX_GERAK_DIAM = 12;
 
-    // ⚠️ KOORDINAT RUMAH (Silakan ganti angka di bawah ini dengan titik koordinat rumah Anda jika diperlukan)
+    // ⚠️ KOORDINAT RUMAH ANDA (Silakan ubah jika diperlukan)
     const KOORDINAT_RUMAH = {
       lat: -6.200000, 
       lng: 106.800000 
@@ -348,7 +348,6 @@
           currentLng = lng;
           updateMap(lat, lng);
 
-          // Batasi akurasi jika benar-benar rusak parah (di atas 100 meter)
           if (accuracy > MIN_AKURASI) {
             updateStatus(`⚠️ GPS tidak akurat<br><br>Akurasi: ${Math.round(accuracy)} meter`, "warning");
             return;
@@ -374,10 +373,8 @@
           if (!nearest) return;
           const namaMasjid = nearest.nama;
 
-          // --- FILTER VALIDASI RUMAH VS MASJID (ANTI LOMPAT) ---
           const jarakKeRumah = getDistance(lat, lng, KOORDINAT_RUMAH.lat, KOORDINAT_RUMAH.lng);
 
-          // Jika posisi HP terbukti lebih dekat ke rumah daripada ke masjid, paksa status ke "Di Rumah"
           if (jarakKeRumah < nearestDistance || jarakKeRumah <= 15) {
             insideMosque = false;
             masjidMasukTime = null;
@@ -389,7 +386,7 @@
                🎯 GPS Akurasi: ${Math.round(accuracy)} meter`, 
               "info"
             );
-            return; // Hentikan proses, jangan lanjut ke pendeteksian masjid
+            return; 
           }
 
           // ==================================================
@@ -407,16 +404,13 @@
               statusMurojaah = false;
             }
 
-            // DETEKSI PERGERAKAN DIAM
             const gerak = getDistance(lat, lng, lastPosition.lat, lastPosition.lng);
             lastPosition = { lat, lng };
 
-            // Reset hanya jika pergerakannya real (saat gps sedang akurat)
             if (gerak > MAX_GERAK_DIAM && accuracy < 40) {
               masjidMasukTime = Date.now();
             }
 
-            // HITUNG MENETAP
             const durasi = ((Date.now() - masjidMasukTime) / 1000 / 60);
 
             updateStatus(
@@ -428,26 +422,22 @@
               "success"
             );
 
-            // AUTO SAVE SKENARIO 1: JAMAAH STANDARD
             if (durasi >= DURASI_JAMAAH && !statusJamaah) {
               statusJamaah = true;
               await saveJamaah(namaMasjid, lat, lng, nearestDistance, "Jamaah", durasi);
             }
 
-            // AUTO SAVE SKENARIO 2: JAMAAH SEMPURNA
             if (durasi >= DURASI_SEMPURNA && !statusSempurna) {
               statusSempurna = true;
               await saveJamaah(namaMasjid, lat, lng, nearestDistance, "Jamaah Sempurna", durasi);
             }
 
-            // AUTO SAVE SKENARIO 3: MUROJAAH
             if (durasi >= DURASI_MUROJAAH && !statusMurojaah) {
               statusMurojaah = true;
               await saveJamaah(namaMasjid, lat, lng, nearestDistance, "Jamaah + Muroja'ah", durasi);
             }
 
           } else {
-            // JIKA KELUAR RADIUS MASJID
             if (nearestDistance > RADIUS_KELUAR) {
               insideMosque = false;
               masjidMasukTime = null;
@@ -463,7 +453,7 @@
         {
           enableHighAccuracy: true,
           timeout: 15000,
-          maximumAge: 0 // Dipaksa mengambil data baru agar tidak memakai cache posisi lama
+          maximumAge: 0 
         }
       );
     }
@@ -499,45 +489,22 @@
     }
 
     // ======================================================
-    // AUTO BACKGROUND SCHEDULE CHECKER (1 MENIT)
-    // ======================================================
-    let lastShalat = "";
-    setInterval(() => {
-      const nowShalat = getShalatNow();
-
-      if (nowShalat && nowShalat !== lastShalat) {
-        lastShalat = nowShalat;
-
-        if (Notification.permission === "granted") {
-          new Notification(`🕌 Waktu ${nowShalat}`, {
-            body: "Tracking Jamaah Dimulai Otomatis",
-            icon: "icon-192.png"
-          });
-        }
-
-        if (!trackingStarted) {
-          startTracking();
-        }
-      }
-    }, 60000);
-
-    // ======================================================
     // INITIALIZATION
     // ======================================================
     initNotification();
   </script>
 
   <script>
-    // Registrasi Service Worker bawaan
+    // Registrasi Service Worker Bawaan
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('sw.js');
     }
 
-    // Mendengarkan sinyal kebangkitan otomatis (Push) dari sw.js
+    // Mendengarkan sinyal otomatis (Push) dari sw.js
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.addEventListener('message', (event) => {
         if (event.data && event.data.command === "AUTO_START_TRACKING") {
-          console.log("Meninggalkan mode standby, otomatis melacak lokasi...");
+          console.log("Mendapat dorongan sinyal server Webpushr! Memulai pelacakan...");
           if (!trackingStarted) {
             startTracking();
           }
@@ -545,6 +512,8 @@
       });
     }
   </script>
-</body>
 
+  <script>(function(w,d,s,id){if(w.webpushr)return;w.webpushr=w.webpushr||function(){(w.webpushr.q=w.webpushr.q||[]).push(arguments)};var js,fjs=d.getElementsByTagName(s)[0];js=d.createElement(s);js.id=id;js.async=1;js.src="https://cdn.webpushr.com/app.min.js";fjs.parentNode.insertBefore(js,fjs);}(window,document,"script","webpushr-jssdk"));webpushr('init','BClXz_z3OqJ87OmsXU_0Vv3D-eR0mZtC2Y19wL8K');</script>
+
+</body>
 </html>
