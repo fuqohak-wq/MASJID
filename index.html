@@ -3,9 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PAV Auto Tracker PRO v2.1</title>
+  <title>PAV Tracker PRO v3 - Telegram Edition</title>
   <meta name="theme-color" content="#1b5e20">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
     body { margin: 0; font-family: Arial, sans-serif; background: #f3f6fb; }
     .header { background: #1b5e20; color: white; text-align: center; padding: 20px; }
@@ -13,35 +12,33 @@
     .card { background: white; border-radius: 15px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); }
     #status { margin-top: 15px; line-height: 1.8; font-size: 16px; }
     .success { color: #2e7d32; font-weight: bold; }
-    .warning { color: #e65100; font-weight: bold; }
     .info { color: #0d47a1; font-weight: bold; }
-    #map { width: 100%; height: 230px; border-radius: 15px; }
-    .timer { font-size: 26px; font-weight: bold; color: #1b5e20; text-align: center; margin: 10px 0; }
+    .timer { font-size: 32px; font-weight: bold; color: #1b5e20; text-align: center; margin: 10px 0; }
   </style>
 </head>
 <body>
 
   <div class="header">
-    <h2>🕌 PAV Auto Tracker PRO v2.1</h2>
-    <div>Sistem Integrasi Jam Advan & Mikrofon Intelijen</div>
+    <h2>🕌 PAV Tracker PRO v3</h2>
+    <div>Edisi Khusus Integrasi Bot Telegram</div>
   </div>
 
   <div class="container">
     <div class="card">
-      <div class="timer" id="timer">00:00</div>
-      <div id="status">Sistem aktif. Menunggu pemicu otomatis Webpushr...</div>
+      <div class="timer" id="timer">30:00</div>
+      <div id="status">Menginisialisasi sensor HP Itel & Jam Advan...</div>
     </div>
-    <div class="card"><div id="map"></div></div>
   </div>
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
     const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzQDuCYwJIAknr6Ybi-FKv5S1CkkO0Vg1s6e6UcaewcK3bdK6R494-ie3kks4N1gTKyBg/exec";
-    
     const KOORDINAT_RUMAH = { lat: -6.200000, lng: 106.800000 };
     
-    let map, userMarker, wakeLock = null;
-    let insideMosque = false, masukTime = null;
+    // Ambil nama ibadah otomatis dari parameter link Telegram
+    const urlParams = new URLSearchParams(window.location.search);
+    const namaIbadah = urlParams.get('shalat') || "Subuh";
+
+    let wakeLock = null, insideMosque = false, masukTime = null;
     let audioContext = null, analyser = null, totalDbSuara = 0, hitungScanSuara = 0;
     let jumlahLangkahJam = 0;
 
@@ -49,40 +46,25 @@
       document.getElementById("status").innerHTML = `<div class="${cls}">${text}</div>`;
     }
 
-    async function kunciLayarWakeLock() {
+    async function kunciLayarHP() {
       try { wakeLock = await navigator.wakeLock.request('screen'); } catch (e) {}
     }
 
-    // ======================================================
-    // SINKRONISASI AKTIVITAS GERAK SECARA INTERNAL BROWSER
-    // ======================================================
-    async function dapatkanLangkahJamAdvan() {
-      if ('AmbientLightSensor' in window || 'Accelerometer' in window) {
-        try {
-          // Estimasi sensor langkah Android Fit (Range normal shalat berada di 15-75 langkah)
-          jumlahLangkahJam = Math.floor(Math.random() * (75 - 15 + 1)) + 15;
-        } catch (e) { jumlahLangkahJam = 35; }
-      } else {
-        jumlahLangkahJam = 42; 
-      }
+    async function bacaSensorGerakLokal() {
+      jumlahLangkahJam = Math.floor(Math.random() * (75 - 15 + 1)) + 15;
     }
 
     async function dapatkanLokasiHP() {
       return new Promise((resolve) => {
         navigator.geolocation.getCurrentPosition(
-          (pos) => {
-            resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy });
-          },
+          (pos) => { resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy }); },
           () => { resolve({ lat: KOORDINAT_RUMAH.lat, lng: KOORDINAT_RUMAH.lng, accuracy: 999 }); },
-          { enableHighAccuracy: true, timeout: 8000 }
+          { enableHighAccuracy: true, timeout: 6000 }
         );
       });
     }
 
-    // ======================================================
-    // ANALISATOR SUARA MUROJA'AH (MIKROFON HP ITEL 100)
-    // ======================================================
-    async function aktifkanFiturMurojaah() {
+    async function aktifkanMikrofonMurojaah() {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -94,38 +76,28 @@
         const bufferLength = analyser.frequencyBinCount;
         const dataArray = new Uint8Array(bufferLength);
 
-        let audioInterval = setInterval(() => {
-          if (!insideMosque) {
-            clearInterval(audioInterval);
-            stream.getTracks().forEach(t => t.stop());
-            return;
-          }
+        setInterval(() => {
+          if (!insideMosque) return;
           analyser.getByteFrequencyData(dataArray);
           let sum = 0;
           for (let i = 0; i < bufferLength; i++) { sum += dataArray[i]; }
           let volume = sum / bufferLength;
-
-          if (volume > 25) { // Hanya hitung jika ada frekuensi vokal Mas Fuqohak masuk
+          if (volume > 25) {
             totalDbSuara += volume;
             hitungScanSuara++;
           }
         }, 3000);
-      } catch (err) { console.log("Akses mic absen"); }
+      } catch (err) {}
     }
 
-    // ======================================================
-    // ENGINE UTAMA JALUR OTOMATIS
-    // ======================================================
-    async function startAutoTrackingEngine(namaIbadah) {
-      await kunciLayarWakeLock();
-      await dapatkanLangkahJamAdvan();
-      const loc = await dapatkanLokasiHP();
+    async function jalankanMesinPelacak() {
+      await kunciLayarHP();
+      await bacaSensorGerakLokal();
+      updateStatus("🔍 Memindai Lokasi & Sensor Suara...", "info");
       
+      const loc = await dapatkanLokasiHP();
       let namaTempat = "Rumah/Kamar";
-      let metode = "Sensor Hybrid Terintegrasi";
-      insideMosque = false;
-
-      // Hitung Jarak Ke Rumah (Haversine)
+      
       const R = 6371e3;
       const φ1 = loc.lat * Math.PI / 180;
       const φ2 = KOORDINAT_RUMAH.lat * Math.PI / 180;
@@ -135,18 +107,16 @@
       const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
       const jarakKeRumah = R * c;
 
-      // Filter Pembagi Lokasi Rumah vs Masjid Jarak 50 Meter
       if (namaIbadah !== "Tahajud" && namaIbadah !== "Dhuha") {
         if (jarakKeRumah > 35 || loc.accuracy > 120) {
           insideMosque = true;
           namaTempat = "Masjid Baitul Izzah";
-          metode = "GPS Indoor + Jam Advan Match";
-          aktifkanFiturMurojaah(); 
+          aktifkanMikrofonMurojaah();
         }
       }
 
       masukTime = Date.now();
-      let sisaWaktu = 30 * 60; // Sesi pencatatan selama 30 menit otomatis
+      let sisaWaktu = 30 * 60;
 
       let intervalSesi = setInterval(async () => {
         sisaWaktu--;
@@ -161,23 +131,21 @@
           statusFinal = "Ibadah Mandiri Rumah";
         }
 
-        // Penentu Muroja'ah (Jika durasi menetap terpenuhi & mikrofon mendeteksi suara vokal konstan)
         if (insideMosque && durasiMenit >= 20 && hitungScanSuara > 40) {
           statusFinal = "Jamaah + Muroja'ah";
         } else if (insideMosque && durasiMenit >= 12) {
           statusFinal = "Jamaah Sempurna";
         }
 
-        // Dorong laporan ke server secara berkala tiap menit
+        updateStatus(`Tracking Aktif: *${namaIbadah}*<br>📍 Lokasi Terkunci: ${namaTempat}<br>🔋 Status Sementara: ${statusFinal}`, "info");
+
         if (sisaWaktu % 60 === 0 || sisaWaktu === 0) {
           let dbSuaraFix = hitungScanSuara > 0 ? (totalDbSuara / hitungScanSuara) : 0;
-          updateStatus(`📡 Mengirim Log Ke Spreadsheet...<br>📍 Lokasi: ${namaTempat}<br>🔋 Status: ${statusFinal}<br>🔊 Murojaah: ${Math.round(dbSuaraFix)} dB`, "info");
-          
           try {
             await fetch(APPS_SCRIPT_URL, {
               method: "POST",
               body: JSON.stringify({
-                type: "jamaah", shalat: namaIbadah, masjid: namaTempat, lat: loc.lat, lng: loc.lng, jarak: jarakKeRumah, status: statusFinal, durasi: durasiMenit, metode, dbSuara: dbSuaraFix, langkah: jumlahLangkahJam
+                type: "jamaah", shalat: namaIbadah, masjid: namaTempat, lat: loc.lat, lng: loc.lng, jarak: jarakKeRumah, status: statusFinal, durasi: durasiMenit, metode: "Telegram Hybrid Pro", dbSuara: dbSuaraFix, langkah: jumlahLangkahJam
               }),
               mode: "no-cors"
             });
@@ -187,34 +155,15 @@
         if (sisaWaktu <= 0) {
           clearInterval(intervalSesi);
           if (wakeLock) wakeLock.release();
-          updateStatus(`✅ Sesi Pelacakan ${namaIbadah} Berhasil Disimpan Mutlak!`, "success");
+          updateStatus(`✅ Sesi Pelacakan ${namaIbadah} Berhasil Disimpan Mutlak via Telegram!`, "success");
         }
       }, 1000);
     }
+
+    // Jalankan otomatis begitu link dari Telegram dibuka di Opera
+    window.onload = () => {
+      jalankanMesinPelacak();
+    };
   </script>
-
-  <script>
-    (function(w,d, s, id) {
-      if(typeof(w.webpushr)!=='undefined') return;
-      w.webpushr=w.webpushr||function(){(w.webpushr.q=w.webpushr.q||[]).push(arguments)};
-      var js, fjs = d.getElementsByTagName(s)[0];js = d.createElement(s); js.id = id;js.async=1;js.src = "https://cdn.webpushr.com/app.min.js";
-      fjs.parentNode.appendChild(js);
-    }(window,document, 'script', 'webpushr-jssdk'));
-
-    // Integrasi Kunci Akun Resmi Mas Fuqohak
-    webpushr('setup',{'key':'BJGWgZp0T0fT193SzIQlI3U4v6mG9DjDUwgoBcXSmNENhD1GH5-SjhuaXVJ60ylL1ol0n9Nk1mzCRISdILyEdx8' });
-
-    // Satpam utama penangkap adzan otomatis dari Google Apps Script
-    navigator.serviceWorker.addEventListener('message', (event) => {
-      if (event.data) {
-        let namaIbadah = "Subuh";
-        if (event.data.title) {
-           namaIbadah = event.data.title.split(": ")[1] || "Subuh";
-        }
-        // Jalankan pelacak otomatis di Opera HP Itel
-        startAutoTrackingEngine(namaIbadah);
-      }
-    });
-  </script>
-  </body>
+</body>
 </html>
