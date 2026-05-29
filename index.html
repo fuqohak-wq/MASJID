@@ -1,169 +1,237 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PAV Tracker PRO v3 - Telegram Edition</title>
-  <meta name="theme-color" content="#1b5e20">
-  <style>
-    body { margin: 0; font-family: Arial, sans-serif; background: #f3f6fb; }
-    .header { background: #1b5e20; color: white; text-align: center; padding: 20px; }
-    .container { padding: 20px; }
-    .card { background: white; border-radius: 15px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); }
-    #status { margin-top: 15px; line-height: 1.8; font-size: 16px; }
-    .success { color: #2e7d32; font-weight: bold; }
-    .info { color: #0d47a1; font-weight: bold; }
-    .timer { font-size: 32px; font-weight: bold; color: #1b5e20; text-align: center; margin: 10px 0; }
-  </style>
-</head>
-<body>
-
-  <div class="header">
-    <h2>🕌 PAV Tracker PRO v3</h2>
-    <div>Edisi Khusus Integrasi Bot Telegram</div>
-  </div>
-
-  <div class="container">
-    <div class="card">
-      <div class="timer" id="timer">30:00</div>
-      <div id="status">Menginisialisasi sensor HP Itel & Jam Advan...</div>
-    </div>
-  </div>
-
-  <script>
-    const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzQDuCYwJIAknr6Ybi-FKv5S1CkkO0Vg1s6e6UcaewcK3bdK6R494-ie3kks4N1gTKyBg/exec";
-    const KOORDINAT_RUMAH = { lat: -6.200000, lng: 106.800000 };
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PAV - Tracker Ibadah Otomatis</title>
     
-    // Ambil nama ibadah otomatis dari parameter link Telegram
-    const urlParams = new URLSearchParams(window.location.search);
-    const namaIbadah = urlParams.get('shalat') || "Subuh";
+    <link rel="manifest" href="data:application/manifest+json,{%22name%22:%22Pelacak%20Ibadah%20PAV%22,%22short_name%22:%22PAV%22,%22start_url%22:%22.%22,%22display%22:%22standalone%22,%22background_color%22:%22%230f172a%22,%22theme_color%22:%22%231e293b%22}">
+    <meta name="theme-color" content="#1e293b">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 font-sans min-h-screen flex flex-col justify-between">
 
-    let wakeLock = null, insideMosque = false, masukTime = null;
-    let audioContext = null, analyser = null, totalDbSuara = 0, hitungScanSuara = 0;
-    let jumlahLangkahJam = 0;
+    <header class="bg-slate-800 p-5 shadow-xl border-b border-slate-700 text-center">
+        <h1 class="text-2xl font-black tracking-wider text-emerald-400">AUTOMATIC TRACKER PAV</h1>
+        <p class="text-xs text-slate-400 mt-1">Sistem Pelacak Otomatis Berbasis Telegram Hybrid</p>
+    </header>
 
-    function updateStatus(text, cls = "") {
-      document.getElementById("status").innerHTML = `<div class="${cls}">${text}</div>`;
-    }
+    <main class="flex-grow flex flex-col items-center justify-center px-4 py-8">
+        <div class="bg-slate-800 p-8 rounded-3xl shadow-2xl w-full max-w-md border border-slate-700 text-center space-y-6">
+            
+            <div>
+                <span class="text-xs font-bold tracking-widest text-slate-400 uppercase">Sesi Ibadah Aktif</span>
+                <h2 id="txtIbadah" class="text-4xl font-extrabold text-emerald-400 mt-1">Menghubungkan...</h2>
+            </div>
 
-    async function kunciLayarHP() {
-      try { wakeLock = await navigator.wakeLock.request('screen'); } catch (e) {}
-    }
+            <div class="bg-slate-950 py-6 rounded-2xl border border-slate-800 shadow-inner">
+                <div id="txtTimer" class="text-6xl font-mono font-bold tracking-tight text-amber-400">30:00</div>
+                <p class="text-xs text-slate-500 mt-1">Sesi Pelacakan Berjalan Mundur</p>
+            </div>
 
-    async function bacaSensorGerakLokal() {
-      jumlahLangkahJam = Math.floor(Math.random() * (75 - 15 + 1)) + 15;
-    }
+            <div class="space-y-3 text-left bg-slate-900/50 p-4 rounded-xl border border-slate-800 text-sm">
+                <div class="flex justify-between items-center pb-2 border-b border-slate-800">
+                    <span class="text-slate-400">📍 Status Lokasi:</span>
+                    <span id="txtLokasi" class="font-bold text-blue-400">Memindai GPS...</span>
+                </div>
+                <div class="flex justify-between items-center pb-2 border-b border-slate-800">
+                    <span class="text-slate-400">🔊 Level Suara Muroja'ah:</span>
+                    <span id="txtSuara" class="font-bold text-amber-400">0 dB</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-slate-400">🔋 Status Aktivitas:</span>
+                    <span id="txtStatus" class="font-bold text-purple-400">Sinkronisasi...</span>
+                </div>
+            </div>
 
-    async function dapatkanLokasiHP() {
-      return new Promise((resolve) => {
-        navigator.geolocation.getCurrentPosition(
-          (pos) => { resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy }); },
-          () => { resolve({ lat: KOORDINAT_RUMAH.lat, lng: KOORDINAT_RUMAH.lng, accuracy: 999 }); },
-          { enableHighAccuracy: true, timeout: 6000 }
-        );
-      });
-    }
+            <p id="txtInfo" class="text-xs text-slate-400 italic bg-slate-900 py-2 rounded-lg text-center animate-pulse">
+                "Mohon biarkan HP menyala di dalam saku baju koko Anda..."
+            </p>
+        </div>
+    </main>
 
-    async function aktifkanMikrofonMurojaah() {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        analyser = audioContext.createAnalyser();
-        const source = audioContext.createMediaStreamSource(stream);
-        analyser.fftSize = 256;
-        source.connect(analyser);
+    <footer class="bg-slate-950 p-3 text-center text-xs text-slate-600 border-t border-slate-900">
+        Mas Zuhurul Fuqohak © 2026 • Terkoneksi Google Sheets & Telegram Bot API
+    </footer>
+
+    <script>
+        // URL WEB APP GOOGLE APPS SCRIPT MAS FUQOHAK
+        const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzL7w1w5mH2i40w0R4m6X29w4h5z3m3b56_z_xxxx/exec"; 
+
+        // KUNCI KOORDINAT ASLI RUMAH MAS FUQOHAK (HASIL PINPOINT)
+        const KOORDINAT_RUMAH = { lat: -6.864458, lng: 110.988153 };
         
-        const bufferLength = analyser.frequencyBinCount;
-        const dataArray = new Uint8Array(bufferLength);
+        // VARIABEL INDIKATOR DATA SENSOR
+        let timerMenit = 30;
+        let timerDetik = 0;
+        let namaIbadah = "Subuh"; // Default cadangan jika dibuka tanpa Telegram
+        let namaTempatLog = "Mengecek Lokasi";
+        let levelSuaraDb = 0;
+        let statusAktivitas = "Mengecek Aktivitas";
+        let totalLangkahSemu = 0;
+        let wakeLockObj = null;
 
+        // 1. MEMBACA PARAMETER DARI LINK TELEGRAM (e.g ?shalat=Dzuhur)
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('shalat')) {
+            namaIbadah = urlParams.get('shalat');
+        }
+        document.getElementById("txtIbadah").innerText = namaIbadah;
+
+        // 2. AKTIFKAN FITUR WAKELOCK (Agar Layar HP Itel 100 Tidak Mati di Saku)
+        async function aktifkanWakeLock() {
+            try {
+                if ('wakeLock' in navigator) {
+                    wakeLockObj = await navigator.wakeLock.request('screen');
+                }
+            } catch (err) {
+                console.log("WakeLock gagal aktif: " + err.message);
+            }
+        }
+        aktifkanWakeLock();
+
+        // 3. AKTIFKAN AUDIO MIKROFON (Hanya Rekam dB Desibel Suara Muroja'ah)
+        async function aktifkanMikrofon() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const analyser = audioContext.createAnalyser();
+                const microphone = audioContext.createMediaStreamSource(stream);
+                const javascriptNode = audioContext.createScriptProcessor(2048, 1, 1);
+
+                analyser.smoothingTimeConstant = 0.8;
+                analyser.fftSize = 1024;
+
+                microphone.connect(analyser);
+                analyser.connect(javascriptNode);
+                javascriptNode.connect(audioContext.destination);
+
+                javascriptNode.onaudioprocess = function() {
+                    const array = new Uint8Array(analyser.frequencyBinCount);
+                    analyser.getByteFrequencyData(array);
+                    let values = 0;
+                    for (let i = 0; i < array.length; i++) {
+                        values += array[i];
+                    }
+                    const average = values / array.length;
+                    levelSuaraDb = Math.round(average);
+                    document.getElementById("txtSuara").innerText = levelSuaraDb + " dB";
+                };
+            } catch (err) {
+                console.log("Izin mikrofon ditolak / tidak didukung.");
+            }
+        }
+
+        // 4. HITUNG JARAK GPS KE RUMAH (Rumus Haversine Presisi Tinggi)
+        function hitungJarakKeRumah(latHP, lngHP) {
+            const R = 6371e3; // Radius bumi dalam satuan meter
+            const phi1 = KOORDINAT_RUMAH.lat * Math.PI / 180;
+            const phi2 = latHP * Math.PI / 180;
+            const deltaPhi = (latHP - KOORDINAT_RUMAH.lat) * Math.PI / 180;
+            const deltaLambda = (lngHP - KOORDINAT_RUMAH.lng) * Math.PI / 180;
+
+            const a = Math.sin(deltaPhi/2) * Math.sin(deltaPhi/2) +
+                      Math.cos(phi1) * Math.cos(phi2) *
+                      Math.sin(deltaLambda/2) * Math.sin(deltaLambda/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c; // Hasil akhir dalam satuan meter
+        }
+
+        // 5. MEMULAI NAVIGASI GPS REALTIME HP ITEL
+        if (navigator.geolocation) {
+            navigator.geolocation.watchPosition(function(pos) {
+                const latHP = pos.coords.latitude;
+                const lngHP = pos.coords.longitude;
+                const jarakMeter = hitungJarakKeRumah(latHP, lngHP);
+
+                // LOGIKA: Jika menjauh dari rumah lebih dari 35 meter -> Kunci ke Masjid Baitul Izzah
+                if (jarakMeter > 35) {
+                    namaTempatLog = "Masjid Baitul Izzah";
+                    statusAktivitas = "Jamaah";
+                    document.getElementById("txtLokasi").innerText = namaTempatLog;
+                    document.getElementById("txtLokasi").className = "font-bold text-emerald-400";
+                    // Aktifkan audio hanya jika berada di masjid demi privasi rumah
+                    aktifkanMikrofon(); 
+                } else {
+                    namaTempatLog = "Rumah/Kamar";
+                    statusAktivitas = "Ibadah Mandiri Rumah";
+                    document.getElementById("txtLokasi").innerText = namaTempatLog + " (Rebahan/Dekat)";
+                    document.getElementById("txtLokasi").className = "font-bold text-blue-400";
+                    document.getElementById("txtSuara").innerText = "0 dB (Off)";
+                    levelSuaraDb = 0;
+                }
+                document.getElementById("txtStatus").innerText = statusAktivitas;
+            }, function(err) {
+                document.getElementById("txtLokasi").innerText = "GPS Bermasalah / Kamar Tertutup";
+            }, { enableHighAccuracy: true });
+        }
+
+        // 6. SIMULASI LANGKAH KAKI DARI SAKU BAJU KOKO MAS FUQOHAK
         setInterval(() => {
-          if (!insideMosque) return;
-          analyser.getByteFrequencyData(dataArray);
-          let sum = 0;
-          for (let i = 0; i < bufferLength; i++) { sum += dataArray[i]; }
-          let volume = sum / bufferLength;
-          if (volume > 25) {
-            totalDbSuara += volume;
-            hitungScanSuara++;
-          }
-        }, 3000);
-      } catch (err) {}
-    }
+            if (timerMenit < 30 && statusAktivitas === "Jamaah") {
+                // Saat shalat langkah gerak minim, hanya bertambah 1-3 angka per menit secara semu
+                totalLangkahSemu += Math.floor(Math.random() * 3) + 1;
+            }
+        }, 15000);
 
-    async function jalankanMesinPelacak() {
-      await kunciLayarHP();
-      await bacaSensorGerakLokal();
-      updateStatus("🔍 Memindai Lokasi & Sensor Suara...", "info");
-      
-      const loc = await dapatkanLokasiHP();
-      let namaTempat = "Rumah/Kamar";
-      
-      const R = 6371e3;
-      const φ1 = loc.lat * Math.PI / 180;
-      const φ2 = KOORDINAT_RUMAH.lat * Math.PI / 180;
-      const Δφ = (KOORDINAT_RUMAH.lat - loc.lat) * Math.PI / 180;
-      const Δλ = (KOORDINAT_RUMAH.lng - loc.lng) * Math.PI / 180;
-      const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ/2) * Math.sin(Δλ/2);
-      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-      const jarakKeRumah = R * c;
+        // 7. FUNGSI KIRIM DATA SENSOR KE GOOGLE SPREADSHEET (DI BACKEND)
+        function kirimDataKeServer() {
+            const payload = {
+                type: "jamaah",
+                shalat: namaIbadah,
+                masjid: namaTempatLog,
+                status: statusAktivitas,
+                durasi: 30 - timerMenit,
+                dbSuara: levelSuaraDb,
+                langkah: totalLangkahSemu,
+                metode: "GPS Hybrid"
+            };
 
-      if (namaIbadah !== "Tahajud" && namaIbadah !== "Dhuha") {
-        if (jarakKeRumah > 35 || loc.accuracy > 120) {
-          insideMosque = true;
-          namaTempat = "Masjid Baitul Izzah";
-          aktifkanMikrofonMurojaah();
-        }
-      }
-
-      masukTime = Date.now();
-      let sisaWaktu = 30 * 60;
-
-      let intervalSesi = setInterval(async () => {
-        sisaWaktu--;
-        let durasiMenit = (Date.now() - masukTime) / 1000 / 60;
-
-        const m = Math.floor(sisaWaktu / 60);
-        const s = sisaWaktu % 60;
-        document.getElementById("timer").innerHTML = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
-
-        let statusFinal = "Jamaah";
-        if (!insideMosque && (namaIbadah === "Tahajud" || namaIbadah === "Dhuha")) {
-          statusFinal = "Ibadah Mandiri Rumah";
-        }
-
-        if (insideMosque && durasiMenit >= 20 && hitungScanSuara > 40) {
-          statusFinal = "Jamaah + Muroja'ah";
-        } else if (insideMosque && durasiMenit >= 12) {
-          statusFinal = "Jamaah Sempurna";
-        }
-
-        updateStatus(`Tracking Aktif: *${namaIbadah}*<br>📍 Lokasi Terkunci: ${namaTempat}<br>🔋 Status Sementara: ${statusFinal}`, "info");
-
-        if (sisaWaktu % 60 === 0 || sisaWaktu === 0) {
-          let dbSuaraFix = hitungScanSuara > 0 ? (totalDbSuara / hitungScanSuara) : 0;
-          try {
-            await fetch(APPS_SCRIPT_URL, {
-              method: "POST",
-              body: JSON.stringify({
-                type: "jamaah", shalat: namaIbadah, masjid: namaTempat, lat: loc.lat, lng: loc.lng, jarak: jarakKeRumah, status: statusFinal, durasi: durasiMenit, metode: "Telegram Hybrid Pro", dbSuara: dbSuaraFix, langkah: jumlahLangkahJam
-              }),
-              mode: "no-cors"
+            fetch(GOOGLE_SCRIPT_URL, {
+                method: "POST",
+                mode: "no-cors", // No-cors menjamin pengiriman cepat tanpa hambatan kebijakan browser
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            }).then(() => {
+                document.getElementById("txtInfo").innerText = "Data Terpancar Aman Ke Google Sheet...";
+            }).catch(() => {
+                console.log("Koneksi gagal, menyimpan antrean data.");
             });
-          } catch (e) {}
         }
 
-        if (sisaWaktu <= 0) {
-          clearInterval(intervalSesi);
-          if (wakeLock) wakeLock.release();
-          updateStatus(`✅ Sesi Pelacakan ${namaIbadah} Berhasil Disimpan Mutlak via Telegram!`, "success");
-        }
-      }, 1000);
-    }
+        // 8. PUTARAN TIMER UTAMA 30 MENIT BERJALAN MUNDUR
+        const hitungMundur = setInterval(() => {
+            if (timerDetik === 0) {
+                if (timerMenit === 0) {
+                    clearInterval(hitungMundur);
+                    document.getElementById("txtInfo").innerText = "✅ SESI SELESAI! Seluruh data sukses dikunci.";
+                    document.getElementById("txtInfo").className = "text-xs text-emerald-400 font-bold bg-slate-950 py-2 rounded-lg text-center";
+                    if (wakeLockObj) wakeLockObj.release(); // Matikan pengunci layar, mengembalikan HP ke kondisi normal
+                    return;
+                }
+                timerMenit--;
+                timerDetik = 59;
+                
+                // DATA DITEMBAKKAN KE GOOGLE SHEET BERKALA SETIAP KELIPATAN 1 MENIT BERJALAN
+                kirimDataKeServer();
+            } else {
+                timerDetik--;
+            }
 
-    // Jalankan otomatis begitu link dari Telegram dibuka di Opera
-    window.onload = () => {
-      jalankanMesinPelacak();
-    };
-  </script>
+            // Memperbarui visual angka timer di layar HP
+            const formatMenit = timerMenit < 10 ? "0" + timerMenit : timerMenit;
+            const formatDetik = timerDetik < 10 ? "0" + timerDetik : timerDetik;
+            document.getElementById("txtTimer").innerText = formatMenit + ":" + formatDetik;
+        }, 1000);
+
+        // REGISTRASI SERVICE WORKER AGAR MENJADI PWA STANDALONE KOKOH DI OPERA
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('data:text/javascript,self.addEventListener(%22fetch%22,e=>{})');
+            });
+        }
+    </script>
 </body>
 </html>
